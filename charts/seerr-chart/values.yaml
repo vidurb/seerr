@@ -4,7 +4,10 @@ image:
   pullPolicy: IfNotPresent
   # -- Overrides the image tag whose default is the chart appVersion.
   tag: ''
+  # -- Image digest without the sha256: prefix (alias: digest).
   sha: ''
+  # -- Image digest, with or without the sha256: prefix (Flux HelmRelease compatibility).
+  digest: ''
 
 imagePullSecrets: []
 nameOverride: ''
@@ -172,6 +175,30 @@ volumeMounts: []
 # - name: foo
 #   mountPath: "/etc/foo"
 #   readOnly: true
+
+# -- Init container that chowns the config volume (needed on some storage backends).
+volumePermissions:
+  enabled: false
+  image:
+    registry: docker.io
+    repository: library/busybox
+    tag: latest
+    pullPolicy: IfNotPresent
+    digest: ''
+  command:
+    - /bin/sh
+    - -c
+    - chown -R 1000:1000 /app/config
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# -- Additional init containers on the output StatefulSet definition.
+extraInitContainers: []
 
 nodeSelector: {}
 

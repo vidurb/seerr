@@ -8,7 +8,8 @@ on:
       - develop
     paths:
       - 'charts/**'
-      - '.github/workflows/release-charts.yml'
+      - '.github/workflows/helm.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
