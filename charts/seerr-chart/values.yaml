@@ -75,6 +75,43 @@ service:
   port: 80
   annotations: {}
 
+# -- Seerr settings.json management
+settings:
+  # -- How settings.json is managed. `ui`: app reads/writes on the config PVC (default).
+  # `helm`: an init container copies Helm-managed settings to the PVC on every pod start.
+  management: ui
+  # -- Use an existing Secret containing settings.json instead of chart-rendered values.
+  # Only used when management is `helm`. The secret key defaults to settings.json.
+  existingSecret: ''
+  existingSecretKey: settings.json
+  # -- Partial settings overrides merged into bundled defaults (AllSettings shape).
+  # Only used when management is `helm` and existingSecret is empty.
+  # Example:
+  #   data:
+  #     public:
+  #       initialized: true
+  #     main:
+  #       applicationTitle: Seerr
+  #       applicationUrl: https://requests.example.com
+  #     network:
+  #       trustProxy: true
+  #     jellyfin:
+  #       ip: jellyfin.example.com
+  #       port: 443
+  #       useSsl: true
+  #       apiKey: secret
+  #     oidcLogin: true
+  #     oidc:
+  #       providers:
+  #         - slug: pocketid
+  #           name: Pocket ID
+  #           issuerUrl: https://auth.example.com
+  #           clientId: ""
+  #           clientSecret: ""
+  #           logo: ""
+  #           newUserLogin: true
+  data: {}
+
 # -- Creating PVC to store configuration
 config:
   persistence:

@@ -33,4 +33,67 @@ Seerr is a stateful application and it is not designed to have multiple replicas
 
 If `replicaCount` value was used - remove it. Helm update should work fine after that.
 
+## Settings management
+
+Seerr stores application configuration in `settings.json` under the config volume (`/app/config/settings.json`).
+
+| `settings.management` | Behavior |
+| --- | --- |
+| `ui` (default) | Seerr reads and writes `settings.json` on the PVC. Use the setup wizard or Settings UI. |
+| `helm` | An init container copies Helm-managed `settings.json` to the PVC on **every pod start**. UI/API changes persist until the next pod restart, then Helm values win again. |
+
+### Helm-managed settings
+
+Set `settings.management` to `helm` and provide overrides under `settings.data`. Values are deep-merged into bundled defaults from `resources/settings-defaults.json` (regenerate with `node hack/generate-settings-defaults.mjs` in the Seerr repo).
+
+```yaml
+settings:
+  management: helm
+  data:
+    public:
+      initialized: true
+    main:
+      applicationTitle: Seerr
+      applicationUrl: https://requests.example.com
+    network:
+      trustProxy: true
+    oidcLogin: true
+    oidc:
+      providers:
+        - slug: pocketid
+          name: Pocket ID
+          issuerUrl: https://auth.example.com
+          clientId: ""
+          clientSecret: ""
+          logo: ""
+          newUserLogin: true
+```
+
+Sensitive values (API keys, SMTP passwords, OIDC client secrets, etc.) should use `settings.existingSecret` pointing to a Kubernetes Secret (for example SOPS-encrypted in GitOps) instead of inline `settings.data`:
+
+```yaml
+settings:
+  management: helm
+  existingSecret: seerr-settings
+  existingSecretKey: settings.json
+```
+
+**Notes:**
+
+- Array fields (`radarr`, `sonarr`, `migrations`, `oidc.providers`) are replaced entirely when overridden in `settings.data`.
+- `oidcLogin` and `oidc` are fork-specific settings keys (not in upstream OpenAPI) for OIDC authentication.
+- Discover settings are not part of `settings.json` and remain UI-managed.
+- Changing Helm values requires a pod restart to re-run the init container (consider [Stakater Reloader](https://github.com/stakater/Reloader) for automatic rollouts).
+- Database connection is configured separately via `extraEnv` (`DB_TYPE`, `DB_HOST`, etc.), not `settings.json`.
+
+Run chart tests: `./ci/test-settings.sh`
+
+### Updating to 3.8.1
+
+Adds OIDC settings keys (`oidcLogin`, `oidc.providers`) to Helm-managed `settings.json`.
+
+### Updating to 3.8.0
+
+Adds Helm-managed `settings.json` via `settings.management` and `settings.data` values.
+
 {{ template "chart.valuesSection" . }}

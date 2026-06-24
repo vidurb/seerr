@@ -28,7 +28,7 @@ spec:
       serviceAccountName: {{ include "seerr.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- if or .Values.volumePermissions.enabled .Values.extraInitContainers }}
+      {{- if or .Values.volumePermissions.enabled (eq (include "seerr.settings.helmEnabled" .) "true") .Values.extraInitContainers }}
       initContainers:
         {{- if .Values.volumePermissions.enabled }}
         - name: volume-permissions
@@ -47,6 +47,32 @@ spec:
               drop:
                 - ALL
           volumeMounts:
+            - name: config
+              mountPath: /app/config
+              subPath: {{ .Values.config.persistence.subPath }}
+        {{- end }}
+        {{- if eq (include "seerr.settings.helmEnabled" .) "true" }}
+        - name: apply-settings
+          image: {{ include "seerr.settings.initImage" . | quote }}
+          imagePullPolicy: {{ .Values.volumePermissions.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - cp /settings-source/{{ default "settings.json" ((.Values.settings | default dict).existingSecretKey) }} /app/config/settings.json && chown 1000:1000 /app/config/settings.json
+          resources:
+            {{- toYaml .Values.volumePermissions.resources | nindent 12 }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: settings-source
+              mountPath: /settings-source
+              readOnly: true
             - name: config
               mountPath: /app/config
               subPath: {{ .Values.config.persistence.subPath }}
@@ -128,6 +154,11 @@ spec:
         - name: config
           persistentVolumeClaim:
             claimName: {{ if .Values.config.persistence.existingClaim }}{{ .Values.config.persistence.existingClaim }}{{- else }}{{ include "seerr.configPersistenceName" . }}{{- end }}
+      {{- if eq (include "seerr.settings.helmEnabled" .) "true" }}
+        - name: settings-source
+          secret:
+            secretName: {{ include "seerr.settings.sourceSecretName" . }}
+      {{- end }}
       {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}
       {{- end }}

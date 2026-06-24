@@ -122,3 +122,55 @@ Volume permissions init container image reference.
 {{- printf "%s/%s:%s" $registry $repository $tag -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Settings management mode (ui or helm).
+*/}}
+{{- define "seerr.settings.management" -}}
+{{- $settings := .Values.settings | default dict -}}
+{{- default "ui" $settings.management -}}
+{{- end }}
+
+{{/*
+True when Helm manages settings.json via init container.
+*/}}
+{{- define "seerr.settings.helmEnabled" -}}
+{{- eq (include "seerr.settings.management" .) "helm" -}}
+{{- end }}
+
+{{/*
+Name of the chart-rendered settings Secret.
+*/}}
+{{- define "seerr.settings.secretName" -}}
+{{- printf "%s-settings" (include "seerr.fullname" .) -}}
+{{- end }}
+
+{{/*
+Secret name used as settings source in helm mode.
+*/}}
+{{- define "seerr.settings.sourceSecretName" -}}
+{{- $settings := .Values.settings | default dict -}}
+{{- if $settings.existingSecret -}}
+{{- $settings.existingSecret -}}
+{{- else -}}
+{{- include "seerr.settings.secretName" . -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Merged settings.json content for helm mode.
+*/}}
+{{- define "seerr.settings.json" -}}
+{{- $settings := .Values.settings | default dict -}}
+{{- $defaults := .Files.Get "resources/settings-defaults.json" | fromJson -}}
+{{- $overrides := $settings.data | default dict -}}
+{{- $merged := mergeOverwrite $defaults $overrides -}}
+{{- $merged | toPrettyJson -}}
+{{- end }}
+
+{{/*
+Apply-settings init container image (reuses volumePermissions busybox image).
+*/}}
+{{- define "seerr.settings.initImage" -}}
+{{- include "seerr.volumePermissions.image" . -}}
+{{- end }}

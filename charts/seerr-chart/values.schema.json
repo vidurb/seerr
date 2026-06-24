@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "settings": {
+      "type": "object",
+      "properties": {
+        "management": {
+          "type": "string",
+          "enum": ["ui", "helm"],
+          "description": "How settings.json is managed. ui: app on PVC. helm: init container applies Helm values on pod start."
+        },
+        "existingSecret": {
+          "type": "string",
+          "description": "Existing Secret name containing settings.json (helm mode only)."
+        },
+        "existingSecretKey": {
+          "type": "string",
+          "default": "settings.json",
+          "description": "Key in existingSecret that holds settings.json."
+        },
+        "data": {
+          "type": "object",
+          "description": "Partial AllSettings overrides merged into chart defaults.",
+          "properties": {
+            "clientId": { "type": "string" },
+            "sessionSecret": { "type": "string" },
+            "vapidPublic": { "type": "string" },
+            "vapidPrivate": { "type": "string" },
+            "main": { "type": "object" },
+            "plex": { "type": "object" },
+            "jellyfin": { "type": "object" },
+            "tautulli": { "type": "object" },
+            "metadataSettings": {
+              "type": "object",
+              "properties": {
+                "tv": { "type": "string", "enum": ["tmdb", "tvdb"] },
+                "anime": { "type": "string", "enum": ["tmdb", "tvdb"] }
+              }
+            },
+            "radarr": { "type": "array" },
+            "sonarr": { "type": "array" },
+            "public": {
+              "type": "object",
+              "properties": {
+                "initialized": { "type": "boolean" }
+              }
+            },
+            "notifications": { "type": "object" },
+            "jobs": { "type": "object" },
+            "network": { "type": "object" },
+            "oidcLogin": {
+              "type": "boolean",
+              "description": "Enable OIDC login (fork-specific settings.json key)."
+            },
+            "oidc": {
+              "type": "object",
+              "description": "OIDC provider configuration (fork-specific settings.json key).",
+              "properties": {
+                "providers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "slug": { "type": "string" },
+                      "name": { "type": "string" },
+                      "issuerUrl": { "type": "string", "format": "uri" },
+                      "clientId": { "type": "string" },
+                      "clientSecret": { "type": "string" },
+                      "logo": { "type": "string" },
+                      "newUserLogin": { "type": "boolean" }
+                    },
+                    "required": [
+                      "slug",
+                      "name",
+                      "issuerUrl",
+                      "clientId",
+                      "clientSecret"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "migrations": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["management"]
+    }
+  }
+}
