@@ -13,6 +13,8 @@ on:
 
 permissions:
   contents: read
+  packages: write
+  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -121,16 +123,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Configure Helm for OCI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+            -u "${{ github.actor }}" --password-stdin
+
       - name: Push charts to GHCR
         env:
           COSIGN_YES: true
         run: |
+          set -euo pipefail
           for chart_path in `find .cr-release-packages -name '*.tgz' -print`; do
             # push chart to OCI
             chart_release_file=$(basename "$chart_path")
             chart_name=${chart_release_file%-*}
-            helm push ${chart_path} oci://ghcr.io/${{ github.repository }} |& tee helm-push-output.log
+            helm push "${chart_path}" "oci://ghcr.io/${{ github.repository }}" |& tee helm-push-output.log
             chart_digest=$(awk -F "[, ]+" '/Digest/{print $NF}' < helm-push-output.log)
+            if [ -z "${chart_digest}" ]; then
+              echo "helm push did not return a digest; aborting before cosign"
+              exit 1
+            fi
             # sign chart
             cosign sign "ghcr.io/${{ github.repository }}/${chart_name}@${chart_digest}"
             # push artifacthub-repo.yml to OCI
