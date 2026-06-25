@@ -158,6 +158,16 @@ Secret name used as settings source in helm mode.
 {{- end }}
 
 {{/*
+Read a Secret data key at render time (requires cluster lookup; no-op when absent).
+*/}}
+{{- define "seerr.settings.secretValue" -}}
+{{- $secret := lookup "v1" "Secret" .context.Release.Namespace .secret -}}
+{{- if and $secret (index $secret.data .key) -}}
+{{- index $secret.data .key | b64dec -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Merged settings.json content for helm mode.
 */}}
 {{- define "seerr.settings.json" -}}
@@ -165,6 +175,74 @@ Merged settings.json content for helm mode.
 {{- $defaults := .Files.Get "resources/settings-defaults.json" | fromJson -}}
 {{- $overrides := $settings.data | default dict -}}
 {{- $merged := mergeOverwrite $defaults $overrides -}}
+{{- $secretRefs := $settings.secretRefs | default dict -}}
+{{- if $secretRefs.clientId }}
+{{- $val := include "seerr.settings.secretValue" (dict "secret" $secretRefs.clientId.secret "key" $secretRefs.clientId.key "context" .) -}}
+{{- if $val }}{{- $_ := set $merged "clientId" $val -}}{{- end }}
+{{- end }}
+{{- if $secretRefs.sessionSecret }}
+{{- $val := include "seerr.settings.secretValue" (dict "secret" $secretRefs.sessionSecret.secret "key" $secretRefs.sessionSecret.key "context" .) -}}
+{{- if $val }}{{- $_ := set $merged "sessionSecret" $val -}}{{- end }}
+{{- end }}
+{{- if $secretRefs.vapidPrivate }}
+{{- $val := include "seerr.settings.secretValue" (dict "secret" $secretRefs.vapidPrivate.secret "key" $secretRefs.vapidPrivate.key "context" .) -}}
+{{- if $val }}{{- $_ := set $merged "vapidPrivate" $val -}}{{- end }}
+{{- end }}
+{{- if $secretRefs.vapidPublic }}
+{{- $val := include "seerr.settings.secretValue" (dict "secret" $secretRefs.vapidPublic.secret "key" $secretRefs.vapidPublic.key "context" .) -}}
+{{- if $val }}{{- $_ := set $merged "vapidPublic" $val -}}{{- end }}
+{{- end }}
+{{- if $secretRefs.mainApiKey }}
+{{- $val := include "seerr.settings.secretValue" (dict "secret" $secretRefs.mainApiKey.secret "key" $secretRefs.mainApiKey.key "context" .) -}}
+{{- if $val }}
+{{- $main := $merged.main | default dict | deepCopy -}}
+{{- $_ := set $main "apiKey" $val -}}
+{{- $_ := set $merged "main" $main -}}
+{{- end }}
+{{- end }}
+{{- if or $secretRefs.oidcClientId $secretRefs.oidcClientSecret }}
+{{- $oidcId := "" -}}
+{{- $oidcSecret := "" -}}
+{{- if $secretRefs.oidcClientId }}
+{{- $oidcId = include "seerr.settings.secretValue" (dict "secret" $secretRefs.oidcClientId.secret "key" $secretRefs.oidcClientId.key "context" .) -}}
+{{- end }}
+{{- if $secretRefs.oidcClientSecret }}
+{{- $oidcSecret = include "seerr.settings.secretValue" (dict "secret" $secretRefs.oidcClientSecret.secret "key" $secretRefs.oidcClientSecret.key "context" .) -}}
+{{- end }}
+{{- if or $oidcId $oidcSecret }}
+{{- $oidc := $merged.oidc | default dict | deepCopy -}}
+{{- $providers := $oidc.providers | default list -}}
+{{- if $providers }}
+{{- $provider := index $providers 0 | default dict | deepCopy -}}
+{{- if $oidcId }}{{- $_ := set $provider "clientId" $oidcId -}}{{- end }}
+{{- if $oidcSecret }}{{- $_ := set $provider "clientSecret" $oidcSecret -}}{{- end }}
+{{- $_ := set $oidc "providers" (list $provider) -}}
+{{- $_ := set $merged "oidc" $oidc -}}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if $secretRefs.radarrApiKey }}
+{{- $val := include "seerr.settings.secretValue" (dict "secret" $secretRefs.radarrApiKey.secret "key" $secretRefs.radarrApiKey.key "context" .) -}}
+{{- if $val }}
+{{- $radarr := $merged.radarr | default list -}}
+{{- if $radarr }}
+{{- $server := index $radarr 0 | default dict | deepCopy -}}
+{{- $_ := set $server "apiKey" $val -}}
+{{- $_ := set $merged "radarr" (list $server) -}}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if $secretRefs.sonarrApiKey }}
+{{- $val := include "seerr.settings.secretValue" (dict "secret" $secretRefs.sonarrApiKey.secret "key" $secretRefs.sonarrApiKey.key "context" .) -}}
+{{- if $val }}
+{{- $sonarr := $merged.sonarr | default list -}}
+{{- if $sonarr }}
+{{- $server := index $sonarr 0 | default dict | deepCopy -}}
+{{- $_ := set $server "apiKey" $val -}}
+{{- $_ := set $merged "sonarr" (list $server) -}}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- $merged | toPrettyJson -}}
 {{- end }}
 

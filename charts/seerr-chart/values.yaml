@@ -111,6 +111,21 @@ settings:
   #           logo: ""
   #           newUserLogin: true
   data: {}
+  # -- Inject sensitive settings from Kubernetes Secrets at render time (helm mode).
+  # Avoids Flux valuesFrom targetPath into array fields (e.g. oidc.providers.0.clientId).
+  # Requires Helm lookup (cluster access during install/upgrade).
+  secretRefs: {}
+  # Example:
+  #   secretRefs:
+  #     clientId:
+  #       secret: seerr-app-secrets
+  #       key: client_id
+  #     oidcClientId:
+  #       secret: seerr-oidc
+  #       key: client_id
+  #     radarrApiKey:
+  #       secret: servarr-api-keys
+  #       key: radarr_api_key
 
 # -- Creating PVC to store configuration
 config:

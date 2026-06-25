@@ -19,6 +19,19 @@
           "default": "settings.json",
           "description": "Key in existingSecret that holds settings.json."
         },
+        "secretRefs": {
+          "type": "object",
+          "description": "Inject settings from Kubernetes Secrets at render time via Helm lookup.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "secret": { "type": "string" },
+              "key": { "type": "string" }
+            },
+            "required": ["secret", "key"],
+            "additionalProperties": false
+          }
+        },
         "data": {
           "type": "object",
           "description": "Partial AllSettings overrides merged into chart defaults.",
