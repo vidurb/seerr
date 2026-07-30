@@ -16,8 +16,8 @@
         },
         "existingSecretKey": {
           "type": "string",
-          "default": "settings.json",
-          "description": "Key in existingSecret that holds settings.json."
+          "default": "settings.overrides.json",
+          "description": "Key in existingSecret that holds the settings overrides patch."
         },
         "secretRefs": {
           "type": "object",
@@ -31,6 +31,10 @@
             "required": ["secret", "key"],
             "additionalProperties": false
           }
+        },
+        "applyResources": {
+          "type": "object",
+          "description": "Resources for the apply-settings init container (helm mode only)."
         },
         "data": {
           "type": "object",

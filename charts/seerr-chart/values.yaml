@@ -78,14 +78,19 @@ service:
 # -- Seerr settings.json management
 settings:
   # -- How settings.json is managed. `ui`: app reads/writes on the config PVC (default).
-  # `helm`: an init container copies Helm-managed settings to the PVC on every pod start.
+  # `helm`: an init container deep-merges Helm-declared overrides onto the live
+  # settings.json (or chart defaults, on first boot) on every pod start. Helm always
+  # wins for keys it declares; anything else already on disk - Plex/Sonarr/Radarr
+  # state discovered live, UI-only settings, etc. - is left untouched.
   management: ui
-  # -- Use an existing Secret containing settings.json instead of chart-rendered values.
-  # Only used when management is `helm`. The secret key defaults to settings.json.
+  # -- Use an existing Secret containing the settings overrides patch instead of
+  # chart-rendered values. Only used when management is `helm`. The secret key
+  # defaults to settings.overrides.json.
   existingSecret: ''
-  existingSecretKey: settings.json
-  # -- Partial settings overrides merged into bundled defaults (AllSettings shape).
-  # Only used when management is `helm` and existingSecret is empty.
+  existingSecretKey: settings.overrides.json
+  # -- Partial settings overrides (AllSettings shape), deep-merged onto the live
+  # settings.json (or bundled defaults on first boot). Only used when management
+  # is `helm` and existingSecret is empty.
   # Example:
   #   data:
   #     public:
@@ -115,6 +120,16 @@ settings:
   # Avoids Flux valuesFrom targetPath into array fields (e.g. oidc.providers.0.clientId).
   # Requires Helm lookup (cluster access during install/upgrade).
   secretRefs: {}
+  # -- Resources for the apply-settings init container (helm mode only).
+  # This container runs the Seerr image's Node runtime to merge settings, so it
+  # needs more headroom than the tiny volume-permissions busybox container.
+  applyResources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
   # Example:
   #   secretRefs:
   #     clientId:

@@ -146,7 +146,7 @@ Name of the chart-rendered settings Secret.
 {{- end }}
 
 {{/*
-Secret name used as settings source in helm mode.
+Secret name used as the overrides source in helm mode.
 */}}
 {{- define "seerr.settings.sourceSecretName" -}}
 {{- $settings := .Values.settings | default dict -}}
@@ -155,6 +155,26 @@ Secret name used as settings source in helm mode.
 {{- else -}}
 {{- include "seerr.settings.secretName" . -}}
 {{- end -}}
+{{- end }}
+
+{{/*
+Key inside the overrides source secret that holds the overrides patch.
+*/}}
+{{- define "seerr.settings.sourceSecretKey" -}}
+{{- $settings := .Values.settings | default dict -}}
+{{- if $settings.existingSecret -}}
+{{- default "settings.overrides.json" $settings.existingSecretKey -}}
+{{- else -}}
+{{- print "settings.overrides.json" -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Name of the ConfigMap holding the bundled settings defaults and the
+apply-settings merge script.
+*/}}
+{{- define "seerr.settings.configMapName" -}}
+{{- printf "%s-settings-defaults" (include "seerr.fullname" .) -}}
 {{- end }}
 
 {{/*
@@ -168,13 +188,26 @@ Read a Secret data key at render time (requires cluster lookup; no-op when absen
 {{- end }}
 
 {{/*
-Merged settings.json content for helm mode.
+Raw bundled settings.json defaults, used by the apply-settings init container
+as the merge base only when no settings.json exists yet on the config volume
+(brand new install).
 */}}
-{{- define "seerr.settings.json" -}}
+{{- define "seerr.settings.defaultsJson" -}}
+{{- .Files.Get "resources/settings-defaults.json" -}}
+{{- end }}
+
+{{/*
+Helm-declared settings overrides (settings.data + secretRefs), without the
+chart defaults merged in. This is the deterministic patch the apply-settings
+init container deep-merges onto the live settings.json (or, on first boot,
+onto the chart defaults) at every pod start - so Helm always wins for keys it
+declares, while anything else already on disk (Plex/Sonarr/Radarr state
+discovered live, UI-only settings, etc.) is left untouched.
+*/}}
+{{- define "seerr.settings.overridesJson" -}}
 {{- $settings := .Values.settings | default dict -}}
-{{- $defaults := .Files.Get "resources/settings-defaults.json" | fromJson -}}
 {{- $overrides := $settings.data | default dict -}}
-{{- $merged := mergeOverwrite $defaults $overrides -}}
+{{- $merged := mergeOverwrite dict $overrides -}}
 {{- $secretRefs := $settings.secretRefs | default dict -}}
 {{- if $secretRefs.clientId }}
 {{- $val := include "seerr.settings.secretValue" (dict "secret" $secretRefs.clientId.secret "key" $secretRefs.clientId.key "context" .) -}}
@@ -244,11 +277,4 @@ Merged settings.json content for helm mode.
 {{- end }}
 {{- end }}
 {{- $merged | toPrettyJson -}}
-{{- end }}
-
-{{/*
-Apply-settings init container image (reuses volumePermissions busybox image).
-*/}}
-{{- define "seerr.settings.initImage" -}}
-{{- include "seerr.volumePermissions.image" . -}}
 {{- end }}

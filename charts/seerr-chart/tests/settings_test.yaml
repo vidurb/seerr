@@ -1,20 +1,24 @@
 suite: settings management
 templates:
   - settings-secret.yaml
+  - settings-configmap.yaml
   - statefulset.yaml
 tests:
-  - it: does not render settings secret in ui mode
+  - it: does not render settings secret or configmap in ui mode
     set:
       settings.management: ui
     asserts:
       - hasDocuments:
           count: 0
         template: settings-secret.yaml
+      - hasDocuments:
+          count: 0
+        template: settings-configmap.yaml
       - notContains:
           content: apply-settings
         template: statefulset.yaml
 
-  - it: renders settings secret and init container in helm mode
+  - it: renders settings secret, defaults configmap and init container in helm mode
     set:
       settings.management: helm
       settings.data.main.applicationTitle: CustomSeerr
@@ -25,11 +29,20 @@ tests:
       - matchRegex:
           pattern: "CustomSeerr"
         template: settings-secret.yaml
+      - isKind:
+          of: ConfigMap
+        template: settings-configmap.yaml
+      - matchRegex:
+          pattern: "merge-settings.js"
+        template: settings-configmap.yaml
       - contains:
           content: apply-settings
         template: statefulset.yaml
       - contains:
-          content: settings-source
+          content: settings-defaults
+        template: statefulset.yaml
+      - contains:
+          content: settings-overrides
         template: statefulset.yaml
 
   - it: uses existingSecret instead of chart secret in helm mode
@@ -40,6 +53,22 @@ tests:
       - hasDocuments:
           count: 0
         template: settings-secret.yaml
+      - isKind:
+          of: ConfigMap
+        template: settings-configmap.yaml
       - contains:
           content: "secretName: my-settings"
+        template: statefulset.yaml
+      - contains:
+          content: "key: settings.overrides.json"
+        template: statefulset.yaml
+
+  - it: uses a custom existingSecretKey when set
+    set:
+      settings.management: helm
+      settings.existingSecret: my-settings
+      settings.existingSecretKey: custom-settings.json
+    asserts:
+      - contains:
+          content: "key: custom-settings.json"
         template: statefulset.yaml

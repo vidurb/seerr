@@ -1,0 +1,13 @@
+{{- if eq (include "seerr.settings.helmEnabled" .) "true" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "seerr.settings.configMapName" . }}
+  labels:
+    {{- include "seerr.labels" . | nindent 4 }}
+data:
+  settings.defaults.json: |
+    {{- include "seerr.settings.defaultsJson" . | nindent 4 }}
+  merge-settings.js: |
+    {{- .Files.Get "resources/merge-settings.js" | nindent 4 }}
+{{- end }}

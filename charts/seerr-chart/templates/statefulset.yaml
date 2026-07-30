@@ -55,25 +55,32 @@ spec:
         {{- end }}
         {{- if eq (include "seerr.settings.helmEnabled" .) "true" }}
         - name: apply-settings
-          image: {{ include "seerr.settings.initImage" . | quote }}
-          imagePullPolicy: {{ .Values.volumePermissions.image.pullPolicy }}
+          image: {{ include "seerr.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - /bin/sh
-            - -c
-            - cp /settings-source/{{ default "settings.json" ((.Values.settings | default dict).existingSecretKey) }} /app/config/settings.json
+            - node
+            - /settings-defaults/merge-settings.js
+            - /app/config/settings.json
+            - /settings-defaults/settings.defaults.json
+            - /settings-overrides/settings.json
+            - /app/config/settings.json
           resources:
-            {{- toYaml .Values.volumePermissions.resources | nindent 12 }}
+            {{- toYaml .Values.settings.applyResources | nindent 12 }}
           securityContext:
             runAsUser: {{ .Values.securityContext.runAsUser }}
             runAsGroup: {{ .Values.securityContext.runAsGroup }}
             runAsNonRoot: true
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
           volumeMounts:
-            - name: settings-source
-              mountPath: /settings-source
+            - name: settings-defaults
+              mountPath: /settings-defaults
+              readOnly: true
+            - name: settings-overrides
+              mountPath: /settings-overrides
               readOnly: true
             - name: config
               mountPath: /app/config
@@ -157,9 +164,15 @@ spec:
           persistentVolumeClaim:
             claimName: {{ if .Values.config.persistence.existingClaim }}{{ .Values.config.persistence.existingClaim }}{{- else }}{{ include "seerr.configPersistenceName" . }}{{- end }}
       {{- if eq (include "seerr.settings.helmEnabled" .) "true" }}
-        - name: settings-source
+        - name: settings-defaults
+          configMap:
+            name: {{ include "seerr.settings.configMapName" . }}
+        - name: settings-overrides
           secret:
             secretName: {{ include "seerr.settings.sourceSecretName" . }}
+            items:
+              - key: {{ include "seerr.settings.sourceSecretKey" . }}
+                path: settings.json
       {{- end }}
       {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}

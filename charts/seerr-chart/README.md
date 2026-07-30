@@ -1,6 +1,6 @@
 # seerr-chart
 
-![Version: 3.8.1](https://img.shields.io/badge/Version-3.8.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v3.3.0](https://img.shields.io/badge/AppVersion-v3.3.0-informational?style=flat-square)
+![Version: 3.9.0](https://img.shields.io/badge/Version-3.9.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: v3.3.0](https://img.shields.io/badge/AppVersion-v3.3.0-informational?style=flat-square)
 
 Seerr helm chart for Kubernetes
 
@@ -46,11 +46,13 @@ Seerr stores application configuration in `settings.json` under the config volum
 | `settings.management` | Behavior |
 | --- | --- |
 | `ui` (default) | Seerr reads and writes `settings.json` on the PVC. Use the setup wizard or Settings UI. |
-| `helm` | An init container copies Helm-managed `settings.json` to the PVC on **every pod start**. UI/API changes persist until the next pod restart, then Helm values win again. |
+| `helm` | An init container deep-merges Helm-declared overrides onto `settings.json` on **every pod start**. |
+
+In `helm` mode, the init container (`apply-settings`) merges rather than overwrites: it reads the live `settings.json` already on the PVC (or, on a brand new install, the chart's bundled defaults), then deep-merges the Helm-declared overrides on top and writes the result back. Keys declared in `settings.data`/`secretRefs` always come from Helm; every other key - including values Seerr only discovers live, like `plex.libraries`, `plex.machineId`, or Sonarr/Radarr sync state - is left exactly as the app last wrote it. Array fields (`radarr`, `sonarr`, `migrations`, `oidc.providers`) still replace entirely when declared in `settings.data`, same as before.
 
 ### Helm-managed settings
 
-Set `settings.management` to `helm` and provide overrides under `settings.data`. Values are deep-merged into bundled defaults from `resources/settings-defaults.json` (regenerate with `node hack/generate-settings-defaults.mjs` in the Seerr repo).
+Set `settings.management` to `helm` and provide overrides under `settings.data`. These are deep-merged onto the live `settings.json` at pod start; the bundled defaults from `resources/settings-defaults.json` (regenerate with `node hack/generate-settings-defaults.mjs` in the Seerr repo) are only used as the merge base on a brand new install.
 
 ```yaml
 settings:
@@ -81,8 +83,10 @@ Sensitive values (API keys, SMTP passwords, OIDC client secrets, etc.) should us
 settings:
   management: helm
   existingSecret: seerr-settings
-  existingSecretKey: settings.json
+  existingSecretKey: settings.overrides.json
 ```
+
+The secret should contain the overrides patch (same partial `AllSettings` shape as `settings.data`), not a full `settings.json` - it gets deep-merged onto the live config the same way `settings.data` does.
 
 **Notes:**
 
@@ -90,9 +94,18 @@ settings:
 - `oidcLogin` and `oidc` are fork-specific settings keys (not in upstream OpenAPI) for OIDC authentication.
 - Discover settings are not part of `settings.json` and remain UI-managed.
 - Changing Helm values requires a pod restart to re-run the init container (consider [Stakater Reloader](https://github.com/stakater/Reloader) for automatic rollouts).
+- Removing a key from `settings.data` does not retroactively clear it from the live `settings.json` - the last-applied value sticks until changed via the UI/API or explicitly overridden again.
 - Database connection is configured separately via `extraEnv` (`DB_TYPE`, `DB_HOST`, etc.), not `settings.json`.
 
 Run chart tests: `./ci/test-settings.sh`
+
+### Updating to 3.9.0
+
+`settings.management: helm` now deep-merges Helm-declared overrides onto the live `settings.json` on every pod start, instead of overwriting the whole file. This preserves values Seerr only discovers live (Plex library scans, `plex.machineId`, Sonarr/Radarr sync state, etc.) across pod restarts.
+
+- The chart secret key changed from `settings.json` to `settings.overrides.json`, and the `existingSecretKey` default changed to match - it now holds only the overrides patch, not a full settings file.
+- A new `<release>-settings-defaults` ConfigMap is rendered in `helm` mode (holds the bundled defaults and merge script); no action needed, but note it as an additional resource if you track chart output.
+- The `apply-settings` init container now runs the Seerr image (for Node) instead of the busybox `volumePermissions` image; give it enough resources via `settings.applyResources` if you've constrained cluster defaults.
 
 ### Updating to 3.8.1
 
@@ -169,10 +182,11 @@ Adds Helm-managed `settings.json` via `settings.management` and `settings.data` 
 | serviceAccount.automount | bool | `true` | Automatically mount a ServiceAccount's API credentials? |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created |
 | serviceAccount.name | string | `""` | If not set and create is true, a name is generated using the fullname template |
-| settings | object | `{"data":{},"existingSecret":"","existingSecretKey":"settings.json","management":"ui"}` | Seerr settings.json management |
-| settings.data | object | `{}` | Partial AllSettings overrides merged into chart defaults (helm mode) |
-| settings.existingSecret | string | `""` | Existing Secret containing settings.json (helm mode) |
-| settings.existingSecretKey | string | `"settings.json"` | Key in existingSecret |
+| settings | object | `{"applyResources":{"limits":{"cpu":"200m","memory":"128Mi"},"requests":{"cpu":"50m","memory":"64Mi"}},"data":{},"existingSecret":"","existingSecretKey":"settings.overrides.json","management":"ui"}` | Seerr settings.json management |
+| settings.applyResources | object | `{"limits":{"cpu":"200m","memory":"128Mi"},"requests":{"cpu":"50m","memory":"64Mi"}}` | Resources for the apply-settings init container (helm mode only) |
+| settings.data | object | `{}` | Partial AllSettings overrides, deep-merged onto the live settings.json (helm mode) |
+| settings.existingSecret | string | `""` | Existing Secret containing the settings overrides patch (helm mode) |
+| settings.existingSecretKey | string | `"settings.overrides.json"` | Key in existingSecret |
 | settings.management | string | `"ui"` | `ui` or `helm` — who controls settings.json |
 | tolerations | list | `[]` |  |
 | volumeMounts | list | `[]` | Additional volumeMounts on the output StatefulSet definition. |

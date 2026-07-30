@@ -34,15 +34,21 @@ assert_contains() {
 
 ui_output="$(render)"
 assert_not_contains "$ui_output" "kind: Secret"
+assert_not_contains "$ui_output" "kind: ConfigMap"
 assert_not_contains "$ui_output" "apply-settings"
 
 helm_output="$(render --set settings.management=helm --set settings.data.main.applicationTitle=CustomSeerr)"
 assert_contains "$helm_output" "kind: Secret"
 assert_contains "$helm_output" "CustomSeerr"
+assert_contains "$helm_output" "kind: ConfigMap"
+assert_contains "$helm_output" "merge-settings.js"
 assert_contains "$helm_output" "apply-settings"
+assert_contains "$helm_output" "settings-defaults"
+assert_contains "$helm_output" "settings-overrides"
 
 existing_output="$(render --set settings.management=helm --set settings.existingSecret=my-settings)"
-assert_not_contains "$existing_output" "name: test-seerr-chart-settings"
+assert_not_contains "$existing_output" "kind: Secret"
 assert_contains "$existing_output" "secretName: my-settings"
+assert_contains "$existing_output" "key: settings.overrides.json"
 
 echo "settings chart tests passed"
