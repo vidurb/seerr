@@ -254,6 +254,28 @@ discovered live, UI-only settings, etc.) is left untouched.
 {{- end }}
 {{- end }}
 {{- end }}
+{{- if or $secretRefs.emailAuthUser $secretRefs.emailAuthPass }}
+{{- $authUser := "" -}}
+{{- $authPass := "" -}}
+{{- if $secretRefs.emailAuthUser }}
+{{- $authUser = include "seerr.settings.secretValue" (dict "secret" $secretRefs.emailAuthUser.secret "key" $secretRefs.emailAuthUser.key "context" .) -}}
+{{- end }}
+{{- if $secretRefs.emailAuthPass }}
+{{- $authPass = include "seerr.settings.secretValue" (dict "secret" $secretRefs.emailAuthPass.secret "key" $secretRefs.emailAuthPass.key "context" .) -}}
+{{- end }}
+{{- if or $authUser $authPass }}
+{{- $notifications := $merged.notifications | default dict | deepCopy -}}
+{{- $agents := $notifications.agents | default dict | deepCopy -}}
+{{- $email := $agents.email | default dict | deepCopy -}}
+{{- $options := $email.options | default dict | deepCopy -}}
+{{- if $authUser }}{{- $_ := set $options "authUser" $authUser -}}{{- end }}
+{{- if $authPass }}{{- $_ := set $options "authPass" $authPass -}}{{- end }}
+{{- $_ := set $email "options" $options -}}
+{{- $_ := set $agents "email" $email -}}
+{{- $_ := set $notifications "agents" $agents -}}
+{{- $_ := set $merged "notifications" $notifications -}}
+{{- end }}
+{{- end }}
 {{- if $secretRefs.radarrApiKey }}
 {{- $val := include "seerr.settings.secretValue" (dict "secret" $secretRefs.radarrApiKey.secret "key" $secretRefs.radarrApiKey.key "context" .) -}}
 {{- if $val }}

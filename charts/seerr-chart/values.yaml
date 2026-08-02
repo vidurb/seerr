@@ -138,6 +138,12 @@ settings:
   #     oidcClientId:
   #       secret: seerr-oidc
   #       key: client_id
+  #     emailAuthUser:
+  #       secret: seerr-ses
+  #       key: smtp_username
+  #     emailAuthPass:
+  #       secret: seerr-ses
+  #       key: smtp_password
   #     radarrApiKey:
   #       secret: servarr-api-keys
   #       key: radarr_api_key
